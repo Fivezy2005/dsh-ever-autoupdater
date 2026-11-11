@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "description": "Automatic plugin update checker for the DSH desktop profile: checks updates at startup (and on a timer) and applies them through the host plugin manager.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fivezy2005/dsh-ever-autoupdater.git",
+    "directory": "plugin/dsh-ever-autoupdater"
+  },
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
