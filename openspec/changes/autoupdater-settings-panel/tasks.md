@@ -29,8 +29,8 @@
 
 ## 6. 真实环境（需用户另行授权）
 
-- [ ] 6.1 重新打包、卸旧装新到 `desktop`（授权后）
-- [ ] 6.2 `curl http://127.0.0.1:<端口>/api/dsh-autoupdater/overview` 返回与 `last-run.json` 一致
+- [x] 6.1 已重新打包并卸旧装新到 `desktop`（plugin_manager remove_bundle + install_bundle 均返回 applied；依赖仍 33 个；旧安装副本备份为 C:\Users\fivez\.dsh\plugins\dsh-autoupdater.bak-20261110；安装副本 autoApply 保持 false）。宿主日志 desktop-next.log 显示新版已加载、重新武装（mode interval，下次 3 小时后）、4 项更新因有会话在跑而推迟，无报错
+- [ ] 6.2（受阻） `curl http://127.0.0.1:<端口>/api/dsh-autoupdater/overview` 返回与 `last-run.json` 一致。实测：桌面端对 curl 这类外部请求一律 403 "Browser access is disabled"（dsh-hook 与不存在的路径同样），无法用 curl 验接口；接口通不通改由 6.3 在设置页里点开确认
 - [ ] 6.3 用户重启 DSH 后在设置页看到「插件更新」栏目；点"立即检查"后上次检查时间刷新
 - [ ] 6.4 手动更新一个插件，在会话运行中验证确认弹窗
 
