@@ -1,0 +1,8 @@
+logs/
+*.log
+node_modules/
+# 打包产物（可由 plugin/ 目录重新打包，不进版本控制）
+dist/
+# DSH 会话本地状态（缓存、patch、局部 AGENTS.md）—— 但 .dsh/skills 要进版本控制
+.dsh/*
+!.dsh/skills/

@@ -1,0 +1,13 @@
+# dsh bundle patch: inserts this plugin into a profile's layer stack.
+- insert:
+    - id: dsh-autoupdater
+      name: 'dsh-autoupdater'
+      config:
+        enabled: true
+        checkOnStart: true
+        startupDelayMs: 45000
+        intervalHours: 6
+        autoApply: true
+        maxUpdatesPerRun: 3
+        skipPackages:
+          - dsh-autoupdater

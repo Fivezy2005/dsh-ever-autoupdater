@@ -1,0 +1,23 @@
+{
+  "name": "dsh-autoupdater",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Automatic plugin update checker for the DSH desktop profile: checks updates at startup (and on a timer) and applies them through the host plugin manager.",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1"
+  }
+}

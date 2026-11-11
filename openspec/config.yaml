@@ -1,0 +1,53 @@
+schema: spec-driven
+
+context: |
+  Language: zh-CN
+  All artifacts must be written in zh-CN.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Project: DSH 插件自动更新（DSH Desktop 的 `desktop` profile 的插件自检与自更新插件）。
+  本仓库只包含更新器自身：插件源码在 `plugin/dsh-autoupdater/`，只读检测脚本在
+  `tools/dsh-autoupdate.mjs`，行为规范在 `openspec/`。宿主（DSH Next App 与 asar 内的
+  plugin-manager）、市场（dshmarket）、以及真实 `desktop` profile 都在本仓库之外。
+  应用更新的唯一通道是桌面宿主进程内的 `pluginManager` 服务（官方市场桌面安装按钮走的是
+  同一条路）；CLI 无头宿主没有该服务，插件在本变更后降级为只读报告。
+  宿主契约（`already-installed` 守卫、`enabled` 默认启用、失败折进返回值）是宿主实现细节，
+  依据写在 `docs/调研结论.md` 的 asar 行号证据里；宿主升级后必须重新核对。
+  涉及真实 `desktop` profile 的安装/更新任务必须逐段取得用户明确授权，未授权前只做只读扫描。
+
+rules:
+  proposal:
+    - 说明变更落在本仓库的哪个路径，以及是否触及 asar 源码、profile 清单或市场代码（本仓库一律不碰）。
+    - 明确写出非目标（Non-Goals），尤其是「不升级 DSH 本体」「不更新市场自身」「不装第三方 updater」。
+    - 涉及宿主契约的变更，必须写明依赖的宿主行为及其失效点。
+    - 若行为无任何外部可观察变化，不要新建能力规范，改为在既有能力的 spec 下走 MODIFIED 或走纯重构变更。
+  specs:
+    - 只写外部可观察行为：不写类名、函数名、库选型、逐步实现细节。
+    - 场景标题必须使用 4 个 #（#### Scenario:），每条 Requirement 至少一个场景。
+    - Requirement 正文不超过 500 字符；一条 Requirement 只表达一个行为，多的拆成多条。
+    - 规范正文用 SHALL / MUST 表述条款；结构化标题与 SHALL / MUST 保持英文，叙述部分用中文。
+    - 描述安全约束时必须写明具体条件（有 agent 在跑、不可移除包、自身包、预发布版本等），不能只写「安全地更新」。
+    - 描述报告行为时必须写明报告的落盘位置与每类结果的区分方式。
+  design:
+    - 每个决策写明理由与被放弃的替代方案，不要只写结论。
+    - 引用宿主或市场行为时，必须同时给出文件路径与行号，并说明宿主升级后的失效点。
+    - 写明回滚策略。
+  tasks:
+    - 每项任务必须带可执行的验证方式（命令、退出码、观察到的行为）。
+    - 纯逻辑改动（定时计算、版本比较、过滤排序）必须有固定输入输出的对照验证，不能只写「实现正确」。
+    - 触碰真实 `desktop` profile 的任务必须显式标注「需用户授权」。
+    - 区分「本变更内完成」与「归档等后续工作」，后者放到 Workflow follow-up 段落。
+
+operations:
+  apply:
+    guidance:
+      - 按 tasks.md 顺序实施，每完成一项立即勾选并回填验证结果。
+      - 改动更新器行为前先读 openspec/specs/ 下对应能力的主规范，确认改动不与既有契约冲突。
+      - 不要在真实 `desktop` profile 上试验；需要实机验证时先取得用户明确授权。
+      - 不要改 asar 源码、profile 的 package.json / cordis.patch.yml，也不要在 profile 目录里跑 pnpm。
+      - 改完插件后至少跑一次 `node --check plugin/dsh-autoupdater/lib/index.js`。
+  archive:
+    guidance:
+      - 归档前确认 openspec validate <change> --strict 通过。
+      - 归档后核对 openspec/specs/ 下确实生成了对应主规范，且 Purpose 段落不是 TBD 占位。
+      - 在总结中列出本次归档新增/修改的能力及其 Requirement 数量。
+      - 归档后同步更新 README.md 与 项目进度.md 的进度表。
