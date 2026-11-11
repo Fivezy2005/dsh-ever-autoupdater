@@ -18,6 +18,7 @@ D:\Workspace\dsh自动更新\        # 独立 git 仓库（分支 main）
 │           ├── tasks.md            # 可勾选的实施清单
 │           └── specs\              # 三份 delta spec（能力级需求）
 ├── plugin\dsh-autoupdater\        # DSH 插件：宿主内定时自检并调用官方管理接口
+├── test\autoupdater.test.mjs      # 插件单元测试（node --test test/）
 ├── tools\dsh-autoupdate.mjs       # 独立只读检测脚本
 ├── docs\调研结论.md               # 路线对比与底层机制证据（每条都带文件路径/行号）
 ├── dist\                          # 打包产物（已 gitignore）
@@ -36,8 +37,9 @@ D:\Workspace\dsh自动更新\        # 独立 git 仓库（分支 main）
 | --- | --- | --- |
 | [`openspec/changes/desktop-autoupdate-in-process/`](openspec/changes/desktop-autoupdate-in-process/) | 当前变更的完整规划（proposal / design / specs / tasks） | ✅ 4/4 产物完成，`validate --strict` 通过 |
 | [`AGENTS.md`](AGENTS.md) | 仓库边界、硬约束、验证要求（面向编码代理） | ✅ |
-| [`plugin/dsh-autoupdater/`](plugin/dsh-autoupdater/) | DSH 插件：宿主内定时自检并调用官方管理接口 | ⚠️ 检测已验证；应用链改造进行中 |
-| [`tools/dsh-autoupdate.mjs`](tools/dsh-autoupdate.mjs) | 独立脚本：只读检测 | ⚠️ 即将降级为只读（见变更的 BREAKING 项） |
+| [`plugin/dsh-autoupdater/`](plugin/dsh-autoupdater/) | DSH 插件：宿主内定时自检并调用官方管理接口 | ✅ 代码完成（tasks 第 1–4 组），29 项单测通过；真实 `desktop` 内验证待授权（第 5、6 组） |
+| [`test/autoupdater.test.mjs`](test/autoupdater.test.mjs) | 插件单元测试（`node --test test/`） | ✅ 29/29 |
+| [`tools/dsh-autoupdate.mjs`](tools/dsh-autoupdate.mjs) | 独立脚本：只读检测 | ✅ 已降级为只读，`--apply` 对 `desktop` 拒绝执行 |
 | [`项目进度.md`](项目进度.md) | 进度、已验证项、待办、风险、决策记录 | — |
 | [`docs/调研结论.md`](docs/调研结论.md) | 路线对比与底层机制证据（每条都带文件路径/行号） | — |
 | [`dist/`](dist/) | 打包产物（插件 zip，已 gitignore） | — |
@@ -79,17 +81,15 @@ openspec instructions apply --change desktop-autoupdate-in-process --json
 
 ```bash
 # 0) 把插件解压到一个纯 ASCII 路径（file: spec 对中文/空格路径不友好）
-#    dist/dsh-autoupdater-0.1.0.zip 里是 dsh-autoupdater/ 三个文件
+#    dist/dsh-autoupdater-0.1.0.zip 里是 cordis.patch.yml / package.json / lib/
 #    例：解压到 C:\Users\fivez\.dsh\plugins\dsh-autoupdater
 
-# 1) 装进 profile（官方操作，会同时写入 dsh.profile.bundles）
-cd "C:/Users/fivez/.dsh/profiles/desktop"
-ELECTRON_RUN_AS_NODE=1 DSH_HOME=C:/Users/fivez/.dsh \
-  "D:/Apps/DSH Next/DSH NEXT.exe" \
-  "D:/Apps/DSH Next/resources/app.asar/lib/plugin-cli.js" \
-  desktop add "file:C:/Users/fivez/.dsh/plugins/dsh-autoupdater"
+# 1) 装进 desktop profile：只能走宿主的 plugin_manager 工具（install_bundle），
+#    不手改 package.json / cordis.patch.yml，不在 profile 目录里跑 pnpm。
+#    这一步会改真实 desktop profile，需要用户明确授权（tasks.md 第 5 组）。
 
-# 2) 重启 DSH Desktop，插件在启动后 45s 首次自检
+# 2) 重启 DSH Desktop，插件在启动后 45s 首次自检；先用 autoApply: false 空跑，
+#    核对 <DSH_HOME>/autoupdater/last-run.json 与市场界面一致，再放开自动安装。
 ```
 
 ### 脚本（只读检测）
@@ -108,14 +108,31 @@ node tools/dsh-autoupdate.mjs --profile desktop
 | `enabled` | `true` | 总开关 |
 | `checkOnStart` | `true` | 启动后是否自检 |
 | `startupDelayMs` | `45000` | 启动后延迟（等宿主热身） |
-| `intervalHours` | `6` | 周期自检间隔，0 = 关闭 |
+| `scheduleMode` | `interval` | `interval`（每隔 N 小时）/ `daily`（每天固定时刻）/ `startup-only`（只在启动时） |
+| `intervalHours` | `3` | `interval` 模式的间隔，0 = 关闭周期触发 |
+| `dailyTime` | `03:30` | `daily` 模式的每日时刻（按 `timeZone` 解释） |
+| `timeZone` | `""` | IANA 时区名，空 = 本机时区；填错会回落为空 |
+| `jitterMinutes` | `5` | 每次触发再随机延迟 0~N 分钟，0 = 不抖动 |
+| `allowPrerelease` | `false` | 是否更新到预发布版本 |
 | `autoApply` | `true` | 是否直接安装（false = 只报告） |
 | `maxUpdatesPerRun` | `3` | 单轮最多更新几个 |
 | `skipPackages` | `['dsh-autoupdater']` | 永不动的包（保护自己） |
 | `marketModule` | `''` | 指定 dshmarket 的 `lib/updates.js` 路径 |
 | `registry` | `https://registry.npmjs.org` | 内置兜底检测用的 registry |
 
-新增的定时配置键（`scheduleMode` / `dailyTime` / `timeZone` / `jitterMinutes`）见当前变更的 `specs/plugin-update-scheduling/spec.md`。
+定时语义见当前变更的 `specs/plugin-update-scheduling/spec.md`。没有发布冷却：新版发布后，下一轮检查就会更新。
+
+### 设置页「插件更新」栏目
+
+装好并重启后，在 DSH 的 设置 里会多一个「插件更新」栏目（变更 `autoupdater-settings-panel`）：
+
+- **状态**：宿主版本、上次检查时间、下次检查时间、当前有没有会话在跑。
+- **待更新列表**：每行显示 现版本 → 目标版本，可「立即更新」或「跳过此版本」（出现更新的版本会重新提示）。
+- **操作**：「立即检查」只检查不安装；「全部更新」会先弹确认，有会话在跑时再弹一次确认。
+- **设置**：自动安装开关、检查方式与间隔、单轮上限、是否含预发布、永不更新的包。保存到 `<DSH_HOME>/autoupdater/settings.json`，下一轮检查起生效，覆盖 `cordis.patch.yml` 的出厂默认。
+- **历史**：本轮已更新 / 失败（带原因）/ 已回滚 / 已跳过；失败版本黑名单可清除。
+
+接口只认本机（`/api/dsh-autoupdater/overview｜settings｜action`），非本机访问返回 403；`registry`、`marketModule` 不在界面里开放。
 
 ## 安全约束（已实现）
 
@@ -123,6 +140,9 @@ node tools/dsh-autoupdate.mjs --profile desktop
 - **有 agent 在跑就不动**：检测 `ctx.get('agents')` → `status === 'running'`（与市场 `runningAgentIds` 同一套判定）。
 - **版本写死**：npm 包安装的是市场报告的那个精确版本，不是 `latest` 漂移值。
 - **只跑自己知道来源的包**：检测源是市场自己的 `checkUpdates()`，不是任意 registry 扫描。
+- **适配优先**：只装与当前宿主版本适配的版本。npm 源最新版明确不适配时，改装最新的适配版；git 源目标提交明确不适配时跳过，不回溯历史。没声明适配的照常安装（宿主安装时会拒绝真不兼容的，失败会回滚）。
+- **失败版本不重试**：某版本整轮失败后记入 `<DSH_HOME>/autoupdater/failed-versions.json`，同版本或更旧的不再尝试，出现更新版本才重新进入流程。
+- **保持启用状态**：更新前停用的包，更新后仍是停用；更新失败会装回旧版并恢复原状态。
 - **不碰系统 pnpm**：真实 profile 只走宿主自带的 pnpm 11.8.0。
 
 ## 风险提示

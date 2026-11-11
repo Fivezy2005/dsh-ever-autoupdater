@@ -17,6 +17,8 @@ DSH Desktop 的 `desktop` profile 现在**只能"查"更新、不能"装"更新*
   5. 更新后未校验版本确实升级（可能静默降级）。
 - **新增插件内定时能力**：`scheduleMode`（`interval` / `daily` / `startup-only`）、`dailyTime`、`timeZone`、`jitterMinutes`，用"一次触发 + 重新武装"取代 `setInterval`（避免 DST 漂移与 24.8 天 `setTimeout` 上限）。
 - **新增决策层过滤**：排除市场自身（`dshmarket`）、插件自身、宿主保护包（`removable === false`）、prerelease；按 patch→minor→major 排序；单次更新数上限。
+- **新增适配优先**：确定更新目标前先判定候选版本是否适配当前宿主（复用市场的判定函数）。明确不适配的版本不装；npm 源改选最新的适配版；未声明适配范围的照常装（宿主装时自会拒绝真不兼容的，失败回滚）。失败过的「包@版本」被记住，不重复重试。
+- **覆盖 npm 与 GitHub 两类来源**：不论插件是否发布到 npm，都纳入更新。
 - **报告增强**：`last-run.json` 增补每包的 from/to/action/error/耗时、跳过原因、回滚标记。
 - **BREAKING**：`tools/dsh-autoupdate.mjs --apply` 对 `desktop` profile 不再是可用路径（官方禁止 CLI 改 desktop）；该脚本降级为「只读检测 + 留档」工具。
 
@@ -37,5 +39,5 @@ DSH Desktop 的 `desktop` profile 现在**只能"查"更新、不能"装"更新*
 - **代码**：`plugin/dsh-autoupdater/lib/index.js`（检测/决策/应用/调度四层）、`plugin/dsh-autoupdater/cordis.patch.yml`（新增配置键）、`tools/dsh-autoupdate.mjs`（降级为只读）、`docs/调研结论.md`（补宿主 in-process 通道的事实）。
 - **运行时**：DSH Desktop 的 `desktop` profile（`C:\Users\fivez\.dsh\profiles\desktop`）——更新时会改写其 `package.json` / `pnpm-lock.yaml` / `cordis.patch.yml`。
 - **依赖**：仅使用宿主已有的 `dshmarket`（检测）与 `pluginManager`（应用），不新增第三方依赖。
-- **宿主契约依赖**：`installBundle` 在 HMR 存在时对已存在的依赖抛 `already-installed`（`@deepseek-ai/dsh-plugin-manager/lib/index.js:1992`）；`removeBundle` 对不可移除的 bundle 抛 `not-removable`；`installBundle` 默认会启用 bundle（同文件 2092 行）。这些是设计前提，宿主升级后需重新核对。
+- **宿主契约依赖**：`installBundle` 在 HMR 存在时对已存在的依赖抛 `already-installed`（`@deepseek-ai/dsh-plugin-manager/lib/index.js:2733`）；`removeBundle` 对不可移除的 bundle 抛 `not-removable`；`installBundle` 默认会启用 bundle（同文件 2859 行）。这些是设计前提，宿主升级后需重新核对。
 - **风险面**：自动替换宿主代码 = 自我提权面（标准预设默认禁用 `tool-plugin-manager` 正是此意），必须由用户显式知情授权后才安装进 `desktop` profile。

@@ -6,8 +6,13 @@
         enabled: true
         checkOnStart: true
         startupDelayMs: 45000
-        intervalHours: 6
+        scheduleMode: interval
+        intervalHours: 3
+        dailyTime: '03:30'
+        timeZone: ''
+        jitterMinutes: 5
         autoApply: true
         maxUpdatesPerRun: 3
+        allowPrerelease: false
         skipPackages:
           - dsh-autoupdater

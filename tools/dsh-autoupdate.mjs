@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 /**
- * dsh-autoupdate — headless plugin updater for a DSH Next profile.
+ * dsh-autoupdate — READ-ONLY update checker for a DSH Next profile.
+ *
+ * `--apply` is refused for the `desktop` profile. Installing into desktop is the
+ * job of the dsh-autoupdater plugin (plugin/dsh-autoupdater), which runs inside the
+ * host and adds what this script cannot: host-compatibility selection, failed-version
+ * memory, enabled-state preservation, rollback, and the "agents running" guard.
+ * `desktop` is also managed exclusively by the Electron app, so a side-channel install
+ * would bypass all of that. `--apply` still works for other (scratch) profiles.
  *
  * Detection: dshmarket's own checkUpdates() (the same engine the Market UI uses).
  * Apply:     the official headless plugin operation (asar /lib/plugin-cli.js),
@@ -11,7 +18,7 @@
  *
  * Usage:
  *   node dsh-autoupdate.mjs                       # report only (default)
- *   node dsh-autoupdate.mjs --apply               # report + apply
+ *   node dsh-autoupdate.mjs --apply --profile <scratch>   # report + apply (NOT for desktop)
  *   node dsh-autoupdate.mjs --json                # machine-readable report
  *   node dsh-autoupdate.mjs --profile desktop --home C:/Users/fivez/.dsh
  *
@@ -50,6 +57,15 @@ function parseArgs(argv) {
 }
 
 const opts = parseArgs(process.argv.slice(2))
+
+if (opts.apply && opts.profile === 'desktop') {
+  console.error(
+    'refused: --apply is disabled for the desktop profile.\n' +
+    '  Installing is done by the dsh-autoupdater plugin inside the host (compat selection,\n' +
+    '  rollback, running-agent guard). This script only reports for desktop.',
+  )
+  process.exit(1)
+}
 const profileDir = join(opts.home, 'profiles', opts.profile)
 
 // ---------------------------------------------------------------- detection

@@ -84,7 +84,10 @@ openspec archive <name> -y                                # 6 完成后归档，
 
 | 文件 | 职责 |
 |---|---|
-| `plugin/dsh-autoupdater/lib/index.js` | 插件全部逻辑：配置合并、检测（市场优先 / 内置兜底）、决策过滤、排序、应用序列、定时触发、报告落盘 |
+| `plugin/dsh-autoupdater/lib/index.js` | 更新器主体：配置合并、检测（市场优先 / 内置兜底）、适配筛选、决策过滤、排序、应用序列、定时触发、手动运行（`deps.manual`）、报告落盘 |
+| `plugin/dsh-autoupdater/lib/store.js` | 用户设置（`settings.json`，7 个白名单键）与跳过版本（`skipped-versions.json`）的校验与原子读写 |
+| `plugin/dsh-autoupdater/lib/api.js` | 设置页用的 3 个本机接口（`/api/dsh-autoupdater/overview｜settings｜action`），仅回环地址，处理函数可脱离服务器测试 |
+| `plugin/dsh-autoupdater/lib/client.js` | 浏览器端：在设置页登记「插件更新」栏目（只用 `textContent`，不拼 HTML） |
 | `plugin/dsh-autoupdater/cordis.patch.yml` | 宿主 bundle patch：在 `dsh.profile.bundles` 插入本插件行 + 默认配置块 |
 | `plugin/dsh-autoupdater/package.json` | 插件包元数据（`dsh.engines.dsh`、`dsh.bundle.patch`、peerDependencies） |
 | `tools/dsh-autoupdate.mjs` | 独立只读检测脚本（退出码 2 = 有更新）。**不得**对 `desktop` 执行安装 |

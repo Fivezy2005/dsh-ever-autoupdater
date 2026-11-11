@@ -7,10 +7,10 @@
 本设计依赖三条从宿主源码中读出的硬事实（`D:\Apps\DSH Next\resources\app.asar` 内的 `@deepseek-ai/dsh-plugin-manager` 与 profile 内的 `dshmarket 1.66.44`）：
 
 1. **桌面宿主进程内存在活跃的 `pluginManager` 服务**（方法：`installBundle` / `removeBundle` / `setBundleEnabled` / `waitForInstall` / `cancelInstall` / `listBundles`）。官方市场的桌面安装按钮走的正是它（`dshmarket/lib/official-desktop.js` 的 `createOfficialDesktopRuntime` → `installOrReinstall`）。
-2. **`installBundle` 在热重载存在时，会在 pnpm 启动之前拒绝覆盖已存在的依赖**：`if (this.ownerContext.get("hmr") !== void 0 && known !== void 0 && Object.hasOwn(before, known)) throw new ManagementFailure("already-installed")`（`lib/index.js:1992`）。因此更新必须先卸载。
-3. **`installBundle` 默认会启用被装的 bundle**：`if (options?.enabled !== false) await this.selectBundle(name, true)`（`lib/index.js:2092`）。因此必须显式传入原启用状态。
+2. **`installBundle` 在热重载存在时，会在 pnpm 启动之前拒绝覆盖已存在的依赖**：`if (this.ownerContext.get("hmr") !== void 0 && known !== void 0 && Object.hasOwn(before, known)) throw new ManagementFailure("already-installed")`（`lib/index.js:2733`）。因此更新必须先卸载。
+3. **`installBundle` 默认会启用被装的 bundle**：`if (options?.enabled !== false) await this.selectBundle(name, true)`（`lib/index.js:2859`）。因此必须显式传入原启用状态。
 
-另有若干约束：`removeBundle` 对不可移除的 bundle 抛 `not-removable`；`change()` 把失败折进返回值（`result.application = 'failed'` + `result.error = { code, diagnostic? }`）而不外抛；`change()` 在热重载存在时走 `hmr.runExclusive(apply)`（`lib/index.js:2330-2335`），外层再包一层会自锁；`checkUpdates` 每次问 registry 的当前最新版本（无累积状态）。
+另有若干约束：`removeBundle` 对不可移除的 bundle 抛 `not-removable`；`change()` 把失败折进返回值（`result.application = 'failed'` + `result.error = { code, diagnostic? }`）而不外抛；`change()` 在热重载存在时走 `hmr.runExclusive(apply)`（`lib/index.js:3103`），外层再包一层会自锁；`checkUpdates` 每次问 registry 的当前最新版本（无累积状态）。
 
 ## Goals / Non-Goals
 
@@ -82,6 +82,8 @@
 
 **做法**：统一为一个 `nextRun(cfg, now)` 函数（`daily` / `interval` / `startup-only` 三种模式），算出下一时刻 → `setTimeout` → 到点执行 → 重新调用 `nextRun` 再次武装。`daily` 模式用 `Intl.DateTimeFormat` 在目标时区枚举 0~23 点的 UTC offset 反推真实时刻，并做"格式化回去仍等于配置时刻"的校验以处理 DST 跳变。
 
+**默认值**：因插件发布频繁，默认 `scheduleMode: interval`、`intervalHours: 3`、`jitterMinutes: 5`，并保留启动后的首次检查（市场检测结果有 30 分钟缓存，更密无益）。**不设发布冷却时间**（用户明确要求：发布后即可装）。
+
 **备选方案**：
 - *宿主定时服务*：契约是 `create(sessionId, request)`，投递的是 prompt 且必须绑定会话——更新是确定性的包管理调用，不能交给 LLM 自由发挥；且只覆盖 DSH 运行期间。→ 不作为执行器。
 - *Windows 计划任务*：对 `desktop` profile 只能"查"不能"装"（官方拒绝 CLI 改 desktop），与插件内定时覆盖范围重合。→ 只作为可选的"DSH 未运行时的只读检测"留档手段，不纳入本次实现。
@@ -96,6 +98,30 @@
 
 **理由**：系统 pnpm 12.14.0 与宿主自带 pnpm 11.8.0 版本不同，曾在一次性 profile 上用系统 pnpm 改坏过 lockfile。真实 `desktop` profile 只走宿主自带的 pnpm。
 
+### D9: 适配优先——候选版本先判定再入计划
+
+**理由**：现有实现直接采用市场报告的 `latest`，不看它是否适配当前宿主；真不兼容时宿主拒绝并回滚，造成每轮白折腾。实测（2026-11-10，宿主 0.2.2-rc.1）：32 个已装依赖中，26 个 npm 源里有 19 个最新版明确适配、5 个没有任何声明但现版本正常运行、0 个明确不适配。因此"未声明就不装"会冻结 5 个正常插件，不可取。
+
+**做法**：
+- 宿主版本取自 `dshmarket/lib/dsh-install.js` 的 `dshHostInfo()`（与市场同源）；判定用 `discovery-compatibility.js` 的 `manifestFacts` + `deriveHostCompatibility`，不自写判定规则。
+- 判定结果三态：`compatible` / `unknown`（未声明）→ 可装；`incompatible` → 不装最新版。
+- npm 源遇 `incompatible`：调用 `findCompatibleVersion(name, hostVersion, hostPackages, registry, fetcher, installedVersion)`，其 `minimumVersionExclusive` 保证只找比已装版本更新的适配版本；找不到则跳过并记录 `requirement` 与宿主版本。
+- git 源：读目标提交的 `package.json` 做同一判定；不适配则跳过，**不回溯历史提交**（成本高、易装到半成品）。
+- **取数顺序（廉价防护）**：先用原生 `fetch` 取完 registry 与 raw 清单数据，再调用市场模块的纯函数；`findCompatibleVersion` 的 `fetcher` 参数由插件注入。依据：探测脚本里曾遇到全局 `fetch` 报 `assert(dispatcher)`；但 2026-11-10 复测，在普通 Node 里逐个导入 `dshmarket/lib` 下 50 个模块，导入后 `fetch` 均正常（200），未能复现。`lib/net.js:16-62` 说明市场只动 undici 的 `.2` 全局槽，`.1`（Node 内置 fetch 读取的槽）不动；该报错应来自探测脚本里清掉 `.1` 之类的操作。结论：不依赖该说法，只保留"先取后判"的顺序作为零成本防护，真实表现以宿主内实测为准（任务 3.6）。
+
+**备选方案**：
+- *未声明即不装*：冻结 5 个现正常运行的插件。→ 排除。
+- *自写版本区间判定*：与市场的判定会出现两套结论（市场自己的 issue #756 即此类）。→ 排除，复用市场函数。
+- *git 源回溯历史提交找适配版本*：需要遍历提交并逐个读清单。→ 排除。
+
+**局限**："适配"只表示插件自己声明过，不保证实际可运行。
+
+### D10: 失败版本黑名单
+
+**理由**：失败后回滚，下一轮定时检查又会选中同一个版本，造成每隔数小时重复失败。
+
+**做法**：把失败的「包名@版本」写入 `<DSH_HOME>/autoupdater/failed-versions.json`；该包出现比失败版本更新的版本时才重新尝试。该文件仅由本插件读写。
+
 ## Risks / Trade-offs
 
 - **自动替换宿主代码 = 自我提权面** → 插件默认 `autoApply` 可关闭；安装进 `desktop` profile 必须由用户显式授权；`skipPackages` 硬编码插件自身。
@@ -104,6 +130,8 @@
 - **浮动 git 源的 remove→add 行为未实测** → 单独安排一个阶段验证，失败则该源退回"只报告"。
 - **每日时刻落在 DST 不存在的时刻** → 反解后做"格式化回去"校验，不匹配则顺延到下一候选日并记录。
 - **更新可能需要重启 DSH 才生效** → 报告中标明 `restartRequired`，不假装已生效。
+- **适配判定只看插件自己的声明**（`unknown` 的 5 个不保证能跑）→ 靠宿主安装期的拒绝 + 失败回滚 + 失败版本黑名单兜底。
+- **GitHub 源的适配判定依赖读到目标提交的 `package.json`** → 读不到时按 `unknown` 处理（可装），并在报告中注明"未能读取适配声明"。
 - **一次装多个包会连续触发多次 pnpm 树重放** → 单轮数量上限（默认 3）控制爆炸半径。
 
 ## Migration Plan
