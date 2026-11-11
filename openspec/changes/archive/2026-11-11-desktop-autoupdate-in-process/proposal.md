@@ -2,7 +2,7 @@
 
 ## Why
 
-DSH Desktop 的 `desktop` profile 现在**只能"查"更新、不能"装"更新**：市场 UI 要手点按钮，官方 `dsh plugin --profile desktop` 被明确拒绝（"managed exclusively by the Electron application"），而本项目自研的 `dsh-autoupdater` 插件在宿主内的应用链从未打通（headless 兜底退出码 1，错误文本还被自身的 `stderr ?? stdout` 取值写法吞掉）。
+DSH Desktop 的 `desktop` profile 现在**只能"查"更新、不能"装"更新**：市场 UI 要手点按钮，官方 `dsh plugin --profile desktop` 被明确拒绝（"managed exclusively by the Electron application"），而本项目自研的 `dsh-ever-autoupdater` 插件在宿主内的应用链从未打通（headless 兜底退出码 1，错误文本还被自身的 `stderr ?? stdout` 取值写法吞掉）。
 
 本轮查证推翻了旧结论：桌面宿主进程内**存在活跃的 `pluginManager` 服务**，而官方市场的桌面安装按钮走的是**同一条底层通道**（`dshmarket/lib/official-desktop.js` 的 `installOrReinstall` = install → `already-installed` → `removeBundle` → install）。因此自动更新不需要发明新机制，只需严格复刻官方调用序列。
 
@@ -36,7 +36,7 @@ DSH Desktop 的 `desktop` profile 现在**只能"查"更新、不能"装"更新*
 
 ## Impact
 
-- **代码**：`plugin/dsh-autoupdater/lib/index.js`（检测/决策/应用/调度四层）、`plugin/dsh-autoupdater/cordis.patch.yml`（新增配置键）、`tools/dsh-autoupdate.mjs`（降级为只读）、`docs/调研结论.md`（补宿主 in-process 通道的事实）。
+- **代码**：`plugin/dsh-ever-autoupdater/lib/index.js`（检测/决策/应用/调度四层）、`plugin/dsh-ever-autoupdater/cordis.patch.yml`（新增配置键）、`tools/dsh-autoupdate.mjs`（降级为只读）、`docs/调研结论.md`（补宿主 in-process 通道的事实）。
 - **运行时**：DSH Desktop 的 `desktop` profile（`C:\Users\fivez\.dsh\profiles\desktop`）——更新时会改写其 `package.json` / `pnpm-lock.yaml` / `cordis.patch.yml`。
 - **依赖**：仅使用宿主已有的 `dshmarket`（检测）与 `pluginManager`（应用），不新增第三方依赖。
 - **宿主契约依赖**：`installBundle` 在 HMR 存在时对已存在的依赖抛 `already-installed`（`@deepseek-ai/dsh-plugin-manager/lib/index.js:2733`）；`removeBundle` 对不可移除的 bundle 抛 `not-removable`；`installBundle` 默认会启用 bundle（同文件 2859 行）。这些是设计前提，宿主升级后需重新核对。

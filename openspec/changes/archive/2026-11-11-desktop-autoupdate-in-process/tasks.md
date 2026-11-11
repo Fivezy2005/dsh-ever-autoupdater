@@ -1,6 +1,6 @@
 # Tasks
 
-> 所有任务默认只改本仓库（`D:\Workspace\dsh自动更新\`）。凡涉及**真实 `desktop` profile** 的任务都标注了「需用户授权」，未授权前不得执行。
+> 所有任务默认只改本仓库（`D:\Workspace\dsh-ever-autoupdater\`）。凡涉及**真实 `desktop` profile** 的任务都标注了「需用户授权」，未授权前不得执行。
 
 ## 1. 修复插件既有缺陷（不触碰任何 profile）
 
@@ -15,7 +15,7 @@
 
 - [x] 2.1 新增配置键 `scheduleMode`（`interval`/`daily`/`startup-only`）、`dailyTime`、`timeZone`、`jitterMinutes`，并在 `cordis.patch.yml` 的 config 块补默认值（默认 `interval`、`intervalHours: 3`、`jitterMinutes: 5`，无发布冷却）；验证：单元测试断言 `resolveConfig({})` 默认值与 `cordis.patch.yml` 一致（`--dump-config` 未实现，以单测代替）
 - [x] 2.2 实现 `nextRun(cfg, now)`：三种模式分别返回下一触发时刻，`daily` 模式按 `timeZone` 解释 `dailyTime`；验证：给定固定 `now` 与配置时刻，返回值落在目标时区的该时刻上
-- [x] 2.3 用「一次触发 + 重新武装」替换现有 `setInterval`（`plugin/dsh-autoupdater/lib/index.js:88-96`），两种模式共用一条代码路径；验证：代码中不再有直接的 `setInterval`，且触发后能重新排定下一次
+- [x] 2.3 用「一次触发 + 重新武装」替换现有 `setInterval`（`plugin/dsh-ever-autoupdater/lib/index.js:88-96`），两种模式共用一条代码路径；验证：代码中不再有直接的 `setInterval`，且触发后能重新排定下一次
 - [x] 2.4 实现 `daily` 的时区反解与 DST 校验（用 `Intl.DateTimeFormat` 枚举目标时区各小时 offset，反解后格式化回去必须仍等于配置时刻）；验证：跨 DST 切换的一组固定输入下，返回时刻仍落在配置时区的配置时刻
 - [x] 2.5 实现抖动（0~`jitterMinutes` 随机延迟）与 `intervalHours = 0` 时关闭周期触发；验证：抖动上限为 0 时实际延迟为 0，上限大于 0 时延迟落在区间内
 - [x] 2.6 保留并强化重入保护：上一轮未结束时跳过本轮，且不影响下一次排定；验证：并发触发两次时第二次被跳过且下一次触发时刻不变

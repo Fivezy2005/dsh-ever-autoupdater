@@ -7,7 +7,7 @@
 ## 目录结构
 
 ```
-D:\Workspace\dsh自动更新\        # 独立 git 仓库（分支 main）
+D:\Workspace\dsh-ever-autoupdater\        # 独立 git 仓库（分支 main）
 ├── openspec\
 │   ├── config.yaml                 # OpenSpec 配置（schema: spec-driven）
 │   ├── specs\                      # 主规格（已归档变更沉淀而来）
@@ -17,7 +17,7 @@ D:\Workspace\dsh自动更新\        # 独立 git 仓库（分支 main）
 │           ├── design.md           # 技术决策与取舍
 │           ├── tasks.md            # 可勾选的实施清单
 │           └── specs\              # 三份 delta spec（能力级需求）
-├── plugin\dsh-autoupdater\        # DSH 插件：宿主内定时自检并调用官方管理接口
+├── plugin\dsh-ever-autoupdater\        # DSH 插件：宿主内定时自检并调用官方管理接口
 ├── test\autoupdater.test.mjs      # 插件单元测试（node --test test/）
 ├── tools\dsh-autoupdate.mjs       # 独立只读检测脚本
 ├── docs\调研结论.md               # 路线对比与底层机制证据（每条都带文件路径/行号）
@@ -37,7 +37,7 @@ D:\Workspace\dsh自动更新\        # 独立 git 仓库（分支 main）
 | --- | --- | --- |
 | [`openspec/changes/desktop-autoupdate-in-process/`](openspec/changes/desktop-autoupdate-in-process/) | 当前变更的完整规划（proposal / design / specs / tasks） | ✅ 4/4 产物完成，`validate --strict` 通过 |
 | [`AGENTS.md`](AGENTS.md) | 仓库边界、硬约束、验证要求（面向编码代理） | ✅ |
-| [`plugin/dsh-autoupdater/`](plugin/dsh-autoupdater/) | DSH 插件：宿主内定时自检并调用官方管理接口 | ✅ 代码完成（tasks 第 1–4 组），29 项单测通过；真实 `desktop` 内验证待授权（第 5、6 组） |
+| [`plugin/dsh-ever-autoupdater/`](plugin/dsh-ever-autoupdater/) | DSH 插件：宿主内定时自检并调用官方管理接口 | ✅ 代码完成（tasks 第 1–4 组），29 项单测通过；真实 `desktop` 内验证待授权（第 5、6 组） |
 | [`test/autoupdater.test.mjs`](test/autoupdater.test.mjs) | 插件单元测试（`node --test test/`） | ✅ 29/29 |
 | [`tools/dsh-autoupdate.mjs`](tools/dsh-autoupdate.mjs) | 独立脚本：只读检测 | ✅ 已降级为只读，`--apply` 对 `desktop` 拒绝执行 |
 | [`项目进度.md`](项目进度.md) | 进度、已验证项、待办、风险、决策记录 | — |
@@ -81,8 +81,8 @@ openspec instructions apply --change desktop-autoupdate-in-process --json
 
 ```bash
 # 0) 把插件解压到一个纯 ASCII 路径（file: spec 对中文/空格路径不友好）
-#    dist/dsh-autoupdater-0.1.0.zip 里是 cordis.patch.yml / package.json / lib/
-#    例：解压到 C:\Users\fivez\.dsh\plugins\dsh-autoupdater
+#    dist/dsh-ever-autoupdater-0.1.0.zip 里是 cordis.patch.yml / package.json / lib/
+#    例：解压到 C:\Users\fivez\.dsh\plugins\dsh-ever-autoupdater
 
 # 1) 装进 desktop profile：只能走宿主的 plugin_manager 工具（install_bundle），
 #    不手改 package.json / cordis.patch.yml，不在 profile 目录里跑 pnpm。
@@ -101,7 +101,7 @@ node tools/dsh-autoupdate.mjs --profile desktop
 
 ### 插件配置
 
-写在 `plugin/dsh-autoupdater/cordis.patch.yml` 的 row config 里：
+写在 `plugin/dsh-ever-autoupdater/cordis.patch.yml` 的 row config 里：
 
 | 键 | 默认 | 含义 |
 | --- | --- | --- |
@@ -116,7 +116,7 @@ node tools/dsh-autoupdate.mjs --profile desktop
 | `allowPrerelease` | `false` | 是否更新到预发布版本 |
 | `autoApply` | `true` | 是否直接安装（false = 只报告） |
 | `maxUpdatesPerRun` | `3` | 单轮最多更新几个 |
-| `skipPackages` | `['dsh-autoupdater']` | 永不动的包（保护自己） |
+| `skipPackages` | `['dsh-ever-autoupdater']` | 永不动的包（保护自己） |
 | `marketModule` | `''` | 指定 dshmarket 的 `lib/updates.js` 路径 |
 | `registry` | `https://registry.npmjs.org` | 内置兜底检测用的 registry |
 
@@ -132,11 +132,11 @@ node tools/dsh-autoupdate.mjs --profile desktop
 - **设置**：自动安装开关、检查方式与间隔、单轮上限、是否含预发布、永不更新的包。保存到 `<DSH_HOME>/autoupdater/settings.json`，下一轮检查起生效，覆盖 `cordis.patch.yml` 的出厂默认。
 - **历史**：本轮已更新 / 失败（带原因）/ 已回滚 / 已跳过；失败版本黑名单可清除。
 
-接口只认本机（`/api/dsh-autoupdater/overview｜settings｜action`），非本机访问返回 403；`registry`、`marketModule` 不在界面里开放。
+接口只认本机（`/api/dsh-ever-autoupdater/overview｜settings｜action`），非本机访问返回 403；`registry`、`marketModule` 不在界面里开放。
 
 ## 安全约束（已实现）
 
-- **不自我更新**：`skipPackages` 含 `dsh-autoupdater`。
+- **不自我更新**：`skipPackages` 含 `dsh-ever-autoupdater`。
 - **有 agent 在跑就不动**：检测 `ctx.get('agents')` → `status === 'running'`（与市场 `runningAgentIds` 同一套判定）。
 - **版本写死**：npm 包安装的是市场报告的那个精确版本，不是 `latest` 漂移值。
 - **只跑自己知道来源的包**：检测源是市场自己的 `checkUpdates()`，不是任意 registry 扫描。

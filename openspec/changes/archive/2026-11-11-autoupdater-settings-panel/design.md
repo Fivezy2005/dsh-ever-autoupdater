@@ -20,7 +20,7 @@
 
 **D2 一个插件注入两个服务**：`apply()` 里分别 `ctx.inject(['loader'], …)`（保持原样，取 pluginManager）与 `ctx.inject(['webServer'], …)`（注册路由）。两边通过 `holder.state` 共享；`loader` 侧启动完成前，路由答 503 而不是崩溃。备选：把两个服务写进同一个 `inject` 数组——但 `loader` 在宿主层、`webServer` 在 profile 层，层级不同，合并会让其中一个永远取不到。本条在宿主内是否成立**待第 6 组实测**（隔离环境的无头宿主没有 webServer）。
 
-**D3 设置覆盖顺序**：出厂默认（`DEFAULTS`）← `cordis.patch.yml` 的 config ← `settings.json`。每轮 `run` 和每次保存都重读 `settings.json`；保存后重新武装定时器，但**不**重排启动检查，避免改设置时多触发一次检查。`skipPackages` 恒含 `dsh-autoupdater`（`resolveConfig` 已保证）。
+**D3 设置覆盖顺序**：出厂默认（`DEFAULTS`）← `cordis.patch.yml` 的 config ← `settings.json`。每轮 `run` 和每次保存都重读 `settings.json`；保存后重新武装定时器，但**不**重排启动检查，避免改设置时多触发一次检查。`skipPackages` 恒含 `dsh-ever-autoupdater`（`resolveConfig` 已保证）。
 
 **D4 白名单校验**：`store.js` 只接受 7 个键（`autoApply`、`allowPrerelease`、`scheduleMode`、`intervalHours`、`dailyTime`、`maxUpdatesPerRun`、`skipPackages`），每个键有范围校验；未知键或无效值整个请求拒绝（400），不部分写入。读取时同样丢弃无效项，手改坏的文件不会把更新器带崩。
 

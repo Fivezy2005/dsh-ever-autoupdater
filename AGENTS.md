@@ -13,9 +13,9 @@ DSH Desktop（`desktop` profile）的插件自动更新器：宿主内定时自�
 | 宿主（DSH Next App + asar 内的 plugin-manager） | `D:\Apps\DSH Next\resources\app.asar\` | **宿主**，本仓库不碰 |
 | 市场（`dshmarket`） | `<profile>/node_modules/dshmarket` | **市场**，本仓库不碰 |
 | 真实 `desktop` profile | `C:\Users\fivez\.dsh\profiles\desktop` | **用户数据**，除授权任务外全程只读 |
-| 插件源码 | `D:\Workspace\dsh自动更新\plugin\dsh-autoupdater` | 本仓库 |
-| 独立只读检测脚本 | `D:\Workspace\dsh自动更新\tools\dsh-autoupdate.mjs` | 本仓库 |
-| 行为规范 | `D:\Workspace\dsh自动更新\openspec\` | 本仓库 |
+| 插件源码 | `D:\Workspace\dsh-ever-autoupdater\plugin\dsh-ever-autoupdater` | 本仓库 |
+| 独立只读检测脚本 | `D:\Workspace\dsh-ever-autoupdater\tools\dsh-autoupdate.mjs` | 本仓库 |
+| 行为规范 | `D:\Workspace\dsh-ever-autoupdater\openspec\` | 本仓库 |
 
 **改本仓库时不要去改 asar 源码、profile 清单或市场代码。** 宿主契约会变——变了就改本仓库的适配层并更新 `docs/调研结论.md` 的行号证据。
 
@@ -29,15 +29,15 @@ openspec status --change desktop-autoupdate-in-process    # 看哪些工件还�
 openspec validate desktop-autoupdate-in-process --strict  # 写完必须过校验
 openspec instructions apply --change desktop-autoupdate-in-process --json  # 实施时的任务说明
 
-node --check plugin/dsh-autoupdater/lib/index.js           # 插件语法检查
+node --check plugin/dsh-ever-autoupdater/lib/index.js           # 插件语法检查
 node tools/dsh-autoupdate.mjs --profile desktop            # 只读检测（不改任何东西）
 ```
 
 打包插件（`dist/` 已被 `.gitignore` 排除）：
 
 ```powershell
-cd plugin/dsh-autoupdater
-Compress-Archive -Path cordis.patch.yml,package.json,lib -DestinationPath ..\..\dist\dsh-autoupdater-0.1.0.zip
+cd plugin/dsh-ever-autoupdater
+Compress-Archive -Path cordis.patch.yml,package.json,lib -DestinationPath ..\..\dist\dsh-ever-autoupdater-0.1.0.zip
 ```
 
 ## 行为契约在 OpenSpec 里
@@ -84,26 +84,26 @@ openspec archive <name> -y                                # 6 完成后归档，
 
 | 文件 | 职责 |
 |---|---|
-| `plugin/dsh-autoupdater/lib/index.js` | 更新器主体：配置合并、检测（市场优先 / 内置兜底）、适配筛选、决策过滤、排序、应用序列、定时触发、手动运行（`deps.manual`）、报告落盘 |
-| `plugin/dsh-autoupdater/lib/store.js` | 用户设置（`settings.json`，7 个白名单键）与跳过版本（`skipped-versions.json`）的校验与原子读写 |
-| `plugin/dsh-autoupdater/lib/api.js` | 设置页用的 3 个本机接口（`/api/dsh-autoupdater/overview｜settings｜action`），仅回环地址，处理函数可脱离服务器测试 |
-| `plugin/dsh-autoupdater/lib/client.js` | 浏览器端：在设置页登记「插件更新」栏目（只用 `textContent`，不拼 HTML） |
-| `plugin/dsh-autoupdater/cordis.patch.yml` | 宿主 bundle patch：在 `dsh.profile.bundles` 插入本插件行 + 默认配置块 |
-| `plugin/dsh-autoupdater/package.json` | 插件包元数据（`dsh.engines.dsh`、`dsh.bundle.patch`、peerDependencies） |
+| `plugin/dsh-ever-autoupdater/lib/index.js` | 更新器主体：配置合并、检测（市场优先 / 内置兜底）、适配筛选、决策过滤、排序、应用序列、定时触发、手动运行（`deps.manual`）、报告落盘 |
+| `plugin/dsh-ever-autoupdater/lib/store.js` | 用户设置（`settings.json`，7 个白名单键）与跳过版本（`skipped-versions.json`）的校验与原子读写 |
+| `plugin/dsh-ever-autoupdater/lib/api.js` | 设置页用的 3 个本机接口（`/api/dsh-ever-autoupdater/overview｜settings｜action`），仅回环地址，处理函数可脱离服务器测试 |
+| `plugin/dsh-ever-autoupdater/lib/client.js` | 浏览器端：在设置页登记「插件更新」栏目（只用 `textContent`，不拼 HTML） |
+| `plugin/dsh-ever-autoupdater/cordis.patch.yml` | 宿主 bundle patch：在 `dsh.profile.bundles` 插入本插件行 + 默认配置块 |
+| `plugin/dsh-ever-autoupdater/package.json` | 插件包元数据（`dsh.engines.dsh`、`dsh.bundle.patch`、peerDependencies） |
 | `tools/dsh-autoupdate.mjs` | 独立只读检测脚本（退出码 2 = 有更新）。**不得**对 `desktop` 执行安装 |
 | `docs/调研结论.md` | 路线对比与底层机制证据（每条带 asar 路径 + 行号） |
 | `项目进度.md` | 进度、已验证项、阻塞点、风险、决策记录 |
 
 ## 硬约束
 
-- **不自我更新**：`skipPackages` 恒含 `dsh-autoupdater`——卸载自己等于卸载执行更新的代码。
+- **不自我更新**：`skipPackages` 恒含 `dsh-ever-autoupdater`——卸载自己等于卸载执行更新的代码。
 - **不碰市场自身**：`dshmarket` 在宿主里 `removable=false`，决策层显式排除并记原因。
 - **不装宿主保护包**：`removable=false` 的 bundle（`@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app`）一律跳过。
 - **有 agent 在跑就整轮只报告**：`hostCtx.get('agents')` → `status === 'running'`，与市场 `runningAgentIds` 同一判定。
 - **只装精确版本**：npm 源安装市场报告的那个精确版本（`saveExact`），不是 `latest` 漂移值；应用前还要做 registry 存在性校验。
 - **不用系统 pnpm**：真实 profile 只走宿主自带的 pnpm 11.8.0（`resources/runtime/x64/primary-runtime`）。系统 pnpm 12.14.0 会破坏 lockfile。
 - **不手写 profile 清单**：装插件只能用宿主的 `plugin_manager` 工具，不手改 `package.json` / `cordis.patch.yml`，不在 profile 目录里跑 pnpm。
-- **插件源码必须装在纯 ASCII 路径**（如 `C:\Users\fivez\.dsh\plugins\dsh-autoupdater`）——中文/空格路径不适合做 `file:` spec。
+- **插件源码必须装在纯 ASCII 路径**（如 `C:\Users\fivez\.dsh\plugins\dsh-ever-autoupdater`）——中文/空格路径不适合做 `file:` spec。
 - **不装第三方 updater**、不装 `dsh-purge`、不走市场 HTTP API（桌面端对外部请求一律 403）、不启用被禁用的 `tool-plugin-manager` / `tool-plugin-market`。
 
 ## 验证要求

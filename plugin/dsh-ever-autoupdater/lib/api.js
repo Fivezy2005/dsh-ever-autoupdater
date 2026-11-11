@@ -1,16 +1,16 @@
 /**
  * The local HTTP face of the updater, for the settings panel. Three routes, loopback only:
  *
- *   GET  /api/dsh-autoupdater/overview   status, pending updates, settings, last run
- *   POST /api/dsh-autoupdater/settings   save a partial settings object
- *   POST /api/dsh-autoupdater/action     check | update | skip | unskip | clearFailed
+ *   GET  /api/dsh-ever-autoupdater/overview   status, pending updates, settings, last run
+ *   POST /api/dsh-ever-autoupdater/settings   save a partial settings object
+ *   POST /api/dsh-ever-autoupdater/action     check | update | skip | unskip | clearFailed
  *
  * The handlers are plain functions of (state, body, api) so tests call them without a server.
  */
 import { join } from 'node:path'
 import { readJson, readSettings, readSkipped, saveSettings, storeDir, validateSettings, writeJson, writeSkipped } from './store.js'
 
-const BASE = '/api/dsh-autoupdater'
+const BASE = '/api/dsh-ever-autoupdater'
 const BODY_LIMIT = 64 * 1024
 
 export function isLoopback(req) {

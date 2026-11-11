@@ -5,7 +5,7 @@ context: |
   All artifacts must be written in zh-CN.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
   Project: DSH 插件自动更新（DSH Desktop 的 `desktop` profile 的插件自检与自更新插件）。
-  本仓库只包含更新器自身：插件源码在 `plugin/dsh-autoupdater/`，只读检测脚本在
+  本仓库只包含更新器自身：插件源码在 `plugin/dsh-ever-autoupdater/`，只读检测脚本在
   `tools/dsh-autoupdate.mjs`，行为规范在 `openspec/`。宿主（DSH Next App 与 asar 内的
   plugin-manager）、市场（dshmarket）、以及真实 `desktop` profile 都在本仓库之外。
   应用更新的唯一通道是桌面宿主进程内的 `pluginManager` 服务（官方市场桌面安装按钮走的是
@@ -44,7 +44,7 @@ operations:
       - 改动更新器行为前先读 openspec/specs/ 下对应能力的主规范，确认改动不与既有契约冲突。
       - 不要在真实 `desktop` profile 上试验；需要实机验证时先取得用户明确授权。
       - 不要改 asar 源码、profile 的 package.json / cordis.patch.yml，也不要在 profile 目录里跑 pnpm。
-      - 改完插件后至少跑一次 `node --check plugin/dsh-autoupdater/lib/index.js`。
+      - 改完插件后至少跑一次 `node --check plugin/dsh-ever-autoupdater/lib/index.js`。
   archive:
     guidance:
       - 归档前确认 openspec validate <change> --strict 通过。

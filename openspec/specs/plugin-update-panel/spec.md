@@ -1,8 +1,13 @@
-## ADDED Requirements
+# plugin-update-panel Specification
+
+## Purpose
+在 DSH 设置页提供「插件更新」栏目：让用户查看更新状态与待更新清单、手动检查与更新、跳过某个版本，并通过本机接口读写更新器设置；所有接口只接受本机回环请求。
+
+## Requirements
 
 ### Requirement: 本机接口 Local-only endpoints
 
-The updater SHALL expose an overview endpoint, a settings endpoint and an action endpoint under `/api/dsh-autoupdater/`, and SHALL answer every request that does not come from the loopback address with 403 without reading or changing anything.
+The updater SHALL expose an overview endpoint, a settings endpoint and an action endpoint under `/api/dsh-ever-autoupdater/`, and SHALL answer every request that does not come from the loopback address with 403 without reading or changing anything.
 
 #### Scenario: 本机请求总览
 - **WHEN** a loopback client requests the overview
@@ -25,7 +30,7 @@ The updater SHALL store settings changed in the panel in `<DSH_HOME>/autoupdater
 - **THEN** the response is 400 with the reason and `settings.json` is unchanged
 
 #### Scenario: 不可移除的跳过项
-- **WHEN** the saved `skipPackages` omits `dsh-autoupdater`
+- **WHEN** the saved `skipPackages` omits `dsh-ever-autoupdater`
 - **THEN** the effective configuration still contains it
 
 ### Requirement: 手动更新 Manual updates

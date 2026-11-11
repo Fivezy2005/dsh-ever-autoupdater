@@ -1,7 +1,7 @@
 # dsh bundle patch: inserts this plugin into a profile's layer stack.
 - insert:
-    - id: dsh-autoupdater
-      name: 'dsh-autoupdater'
+    - id: dsh-ever-autoupdater
+      name: 'dsh-ever-autoupdater'
       config:
         enabled: true
         checkOnStart: true
@@ -15,4 +15,4 @@
         maxUpdatesPerRun: 3
         allowPrerelease: false
         skipPackages:
-          - dsh-autoupdater
+          - dsh-ever-autoupdater

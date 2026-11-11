@@ -1,5 +1,5 @@
 /**
- * dsh-autoupdater — check for plugin updates in this profile and apply them.
+ * dsh-ever-autoupdater — check for plugin updates in this profile and apply them.
  *
  * Detection reuses the market's own `checkUpdates()` (dshmarket/lib/updates.js) so the
  * list of updates is exactly the one the market UI shows. When that module is not
@@ -25,9 +25,9 @@ import { spawnSync } from 'node:child_process'
 import { registerRoutes } from './api.js'
 import { SCHEDULE_MODES, readSettings, readSkipped, storeDir, writeJson } from './store.js'
 
-export const name = 'dsh-autoupdater'
+export const name = 'dsh-ever-autoupdater'
 
-const SELF = 'dsh-autoupdater'
+const SELF = 'dsh-ever-autoupdater'
 const MARKET = 'dshmarket'
 /** `setTimeout` cannot wait longer than this (≈ 24.8 days). */
 const MAX_TIMEOUT_MS = 2_147_483_647
@@ -82,7 +82,7 @@ export function resolveConfig(config) {
 export function apply(ctx, config) {
   const base = config ?? {}
   const cfg = resolveConfig(base)
-  const log = ctx.logger('dsh-autoupdater')
+  const log = ctx.logger('dsh-ever-autoupdater')
   if (cfg.enabled === false) {
     log.info('automatic updates are disabled by configuration')
     return
@@ -103,7 +103,7 @@ export function apply(ctx, config) {
   ctx.inject(['webServer'], (c) => {
     try {
       const dispose = registerRoutes(c.get('webServer'), holder, api)
-      c.effect(() => () => dispose(), 'dsh-autoupdater.routes')
+      c.effect(() => () => dispose(), 'dsh-ever-autoupdater.routes')
     } catch (error) {
       log.warn(`the settings panel routes could not be registered: ${describe(error)}`)
     }
@@ -155,7 +155,7 @@ async function start(hostCtx, baseConfig, log) {
     nextAt: null,
   }
 
-  hostCtx.effect(() => () => state.scheduler?.stop(), 'dsh-autoupdater.schedule')
+  hostCtx.effect(() => () => state.scheduler?.stop(), 'dsh-ever-autoupdater.schedule')
   const cfg = armScheduler(state, log, { startup: true })
   log.info(`armed for profile "${state.profileName}" (${state.profileDir}), mode ${cfg.scheduleMode}`)
   return state
@@ -648,7 +648,7 @@ function verdictOf(compat, manifestJson) {
 
 async function fetchJsonOrNull(url, fetchImpl) {
   try {
-    const response = await fetchImpl(url, { signal: AbortSignal.timeout(15_000), headers: { accept: 'application/json', 'user-agent': 'dsh-autoupdater' } })
+    const response = await fetchImpl(url, { signal: AbortSignal.timeout(15_000), headers: { accept: 'application/json', 'user-agent': 'dsh-ever-autoupdater' } })
     if (response.status === 404) return { missing: true }
     if (!response.ok) return { error: `HTTP ${response.status}` }
     return { json: await response.json() }

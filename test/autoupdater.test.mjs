@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 import {
   DEFAULTS, resolveConfig, nextRun, jitterMs, createScheduler, buildPlan, applyUpdate, run,
   compareVersions, classifyJump, describeProcessFailure, describeFailure, pinSpec, runningAgentIds,
-} from '../plugin/dsh-autoupdater/lib/index.js'
+} from '../plugin/dsh-ever-autoupdater/lib/index.js'
 
 const log = { info() {}, warn() {}, error() {} }
 const iso = (date) => (date === null ? null : date.toISOString())
@@ -23,7 +23,7 @@ test('defaults: interval, 3h, jitter 5, no cooldown key, self always skipped', (
   assert.equal(cfg.jitterMinutes, 5)
   assert.equal(cfg.checkOnStart, true)
   assert.ok(!('cooldownHours' in cfg))
-  assert.deepEqual(resolveConfig({ skipPackages: ['x'] }).skipPackages.sort(), ['dsh-autoupdater', 'x'])
+  assert.deepEqual(resolveConfig({ skipPackages: ['x'] }).skipPackages.sort(), ['dsh-ever-autoupdater', 'x'])
   assert.equal(resolveConfig({ scheduleMode: 'bogus', dailyTime: '25:99', timeZone: 'Nope/Zone' }).scheduleMode, 'interval')
   assert.equal(resolveConfig({ dailyTime: '25:99' }).dailyTime, DEFAULTS.dailyTime)
   assert.equal(resolveConfig({ timeZone: 'Nope/Zone' }).timeZone, '')
@@ -101,7 +101,7 @@ test('scheduler: startup trigger, then scheduled triggers re-arm themselves (no 
   assert.equal(clock.queue.length, 1, 'exactly one next trigger is armed')
   scheduler.stop()
   assert.equal(clock.queue.length, 0)
-  const source = readFileSync(new URL('../plugin/dsh-autoupdater/lib/index.js', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../plugin/dsh-ever-autoupdater/lib/index.js', import.meta.url), 'utf8')
   assert.ok(!/\bsetInterval\b/.test(source), 'no setInterval in the plugin')
 })
 
@@ -249,10 +249,10 @@ test('plan (git): incompatible → skipped; compatible → update; unreadable �
 })
 
 test('plan: exclusions each carry a reason; prerelease off by default; order is patch → minor → major', async () => {
-  const state = makeProfile({ dshmarket: '1.0.0', 'dsh-autoupdater': '0.1.0', plain: '1.0.0', pre: '1.0.0', major: '1.0.0', minor: '1.0.0', patch: '1.0.0' })
+  const state = makeProfile({ dshmarket: '1.0.0', 'dsh-ever-autoupdater': '0.1.0', plain: '1.0.0', pre: '1.0.0', major: '1.0.0', minor: '1.0.0', patch: '1.0.0' })
   const detected = {
     rows: [
-      row('dshmarket', '1.0.0', '1.1.0'), row('dsh-autoupdater', '0.1.0', '0.2.0'), row('plain', '1.0.0', '1.1.0', { notAPlugin: true }),
+      row('dshmarket', '1.0.0', '1.1.0'), row('dsh-ever-autoupdater', '0.1.0', '0.2.0'), row('plain', '1.0.0', '1.1.0', { notAPlugin: true }),
       row('pre', '1.0.0', '1.1.0-rc.1'), row('major', '1.0.0', '2.0.0'), row('minor', '1.0.0', '1.1.0'), row('patch', '1.0.0', '1.0.1'),
     ],
   }
@@ -261,7 +261,7 @@ test('plan: exclusions each carry a reason; prerelease off by default; order is 
   assert.deepEqual(plan.map((entry) => entry.name), ['patch', 'minor', 'major'])
   const reasons = Object.fromEntries(skipped.map((item) => [item.name, item.reason]))
   assert.match(reasons.dshmarket, /market cannot update itself/)
-  assert.match(reasons['dsh-autoupdater'], /cannot update itself/)
+  assert.match(reasons['dsh-ever-autoupdater'], /cannot update itself/)
   assert.match(reasons.plain, /plain dependency/)
   assert.match(reasons.pre, /prerelease/)
   assert.ok(Object.values(reasons).every((reason) => reason !== ''))

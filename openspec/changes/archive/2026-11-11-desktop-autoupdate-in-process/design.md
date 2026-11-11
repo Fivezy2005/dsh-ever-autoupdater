@@ -136,7 +136,7 @@
 
 ## Migration Plan
 
-1. 修插件既有缺陷（错误回显、启用状态、执行序列、版本校验）——只改 `plugin/dsh-autoupdater/`，不碰任何 profile。
+1. 修插件既有缺陷（错误回显、启用状态、执行序列、版本校验）——只改 `plugin/dsh-ever-autoupdater/`，不碰任何 profile。
 2. 加定时能力（`scheduleMode` / `dailyTime` / `timeZone` / `jitterMinutes`）+ 重新武装改造。
 3. 重建一次性 profile 做无头通道验证（CLI 宿主下挂载、检测、错误可见）。
 4. **需用户授权**：把插件解压到纯 ASCII 路径并装进 `desktop` profile。

@@ -7,9 +7,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EventEmitter } from 'node:events'
 
-import { apply, armScheduler, buildPlan, effectiveConfig, resolveConfig, run, runningAgentIds } from '../plugin/dsh-autoupdater/lib/index.js'
-import { SETTING_KEYS, readSettings, readSkipped, saveSettings, validateSettings } from '../plugin/dsh-autoupdater/lib/store.js'
-import { buildOverview, handleAction, isLoopback, registerRoutes, saveSettingsRequest } from '../plugin/dsh-autoupdater/lib/api.js'
+import { apply, armScheduler, buildPlan, effectiveConfig, resolveConfig, run, runningAgentIds } from '../plugin/dsh-ever-autoupdater/lib/index.js'
+import { SETTING_KEYS, readSettings, readSkipped, saveSettings, validateSettings } from '../plugin/dsh-ever-autoupdater/lib/store.js'
+import { buildOverview, handleAction, isLoopback, registerRoutes, saveSettingsRequest } from '../plugin/dsh-ever-autoupdater/lib/api.js'
 
 const log = { info() {}, warn() {}, error() {} }
 
@@ -98,7 +98,7 @@ test('effectiveConfig: shipped defaults, then saved settings; the updater itself
   assert.equal(cfg.autoApply, true)
   assert.equal(cfg.intervalHours, 4)
   assert.equal(cfg.registry, 'https://example.test')
-  assert.deepEqual([...cfg.skipPackages].sort(), ['dsh-autoupdater', 'x'])
+  assert.deepEqual([...cfg.skipPackages].sort(), ['dsh-ever-autoupdater', 'x'])
 })
 
 test('armScheduler: re-arming uses the saved interval and does not queue a boot check', () => {
@@ -270,7 +270,7 @@ test('settings request: invalid → 400 and nothing written; valid → saved and
   assert.deepEqual(readSettings(state.home), { autoApply: true, intervalHours: 6 })
   assert.equal(rearmed, 1)
   const noSelf = saveSettingsRequest(state, { skipPackages: ['x'] }, api)
-  assert.ok(noSelf.body.settings.skipPackages.includes('dsh-autoupdater'))
+  assert.ok(noSelf.body.settings.skipPackages.includes('dsh-ever-autoupdater'))
 })
 
 test('overview: pending excludes applied and user-skipped; carries settings, agents and history', async () => {
@@ -352,11 +352,11 @@ test('routes: loopback only, method checked, JSON validated, state required', as
   const holder = { state }
   const server = fakeWebServer()
   const dispose = registerRoutes(server, holder, apiFor(state))
-  assert.deepEqual([...server.routes.keys()].sort(), ['/api/dsh-autoupdater/action', '/api/dsh-autoupdater/overview', '/api/dsh-autoupdater/settings'])
+  assert.deepEqual([...server.routes.keys()].sort(), ['/api/dsh-ever-autoupdater/action', '/api/dsh-ever-autoupdater/overview', '/api/dsh-ever-autoupdater/settings'])
 
-  const overview = '/api/dsh-autoupdater/overview'
-  const settings = '/api/dsh-autoupdater/settings'
-  const action = '/api/dsh-autoupdater/action'
+  const overview = '/api/dsh-ever-autoupdater/overview'
+  const settings = '/api/dsh-ever-autoupdater/settings'
+  const action = '/api/dsh-ever-autoupdater/action'
 
   const remote = await call(server, overview, 'GET', '192.168.1.5')
   assert.equal(remote.status, 403)
@@ -390,7 +390,7 @@ test('routes: an oversized body is refused', async () => {
   const server = fakeWebServer()
   registerRoutes(server, { state }, apiFor(state))
   const res = response()
-  server.routes.get('/api/dsh-autoupdater/settings')(request('POST', '127.0.0.1', 'x'.repeat(70 * 1024)), res)
+  server.routes.get('/api/dsh-ever-autoupdater/settings')(request('POST', '127.0.0.1', 'x'.repeat(70 * 1024)), res)
   await res.done
   assert.equal(res.statusCode, 413)
   assert.match(res.body, /too large/)
@@ -418,13 +418,13 @@ test('apply: one plugin entry needs both the loader and the web server; routes g
   injected.webServer(webCtx)
   assert.equal(server.routes.size, 3)
   // Routes exist before the loader finished: they answer 503 rather than crash.
-  assert.equal((await call(server, '/api/dsh-autoupdater/overview', 'GET', '127.0.0.1')).status, 503)
+  assert.equal((await call(server, '/api/dsh-ever-autoupdater/overview', 'GET', '127.0.0.1')).status, 503)
 
   injected.loader(hostCtx)
-  for (let i = 0; i < 50 && (await call(server, '/api/dsh-autoupdater/overview', 'GET', '127.0.0.1')).status === 503; i++) {
+  for (let i = 0; i < 50 && (await call(server, '/api/dsh-ever-autoupdater/overview', 'GET', '127.0.0.1')).status === 503; i++) {
     await new Promise((resolve) => setTimeout(resolve, 10))
   }
-  const overview = await call(server, '/api/dsh-autoupdater/overview', 'GET', '127.0.0.1')
+  const overview = await call(server, '/api/dsh-ever-autoupdater/overview', 'GET', '127.0.0.1')
   assert.equal(overview.status, 200)
   assert.equal(overview.json.profile, 'desktop')
 

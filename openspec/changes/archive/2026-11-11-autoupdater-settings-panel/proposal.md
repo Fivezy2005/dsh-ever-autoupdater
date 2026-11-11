@@ -21,7 +21,7 @@
 
 ## Impact
 
-- 代码：`plugin/dsh-autoupdater/lib/index.js`（设置层、手动运行、路由）、新增 `lib/client.js`、`package.json`（`exports["./client"]`、`dsh.client`、`files`）。
+- 代码：`plugin/dsh-ever-autoupdater/lib/index.js`（设置层、手动运行、路由）、新增 `lib/client.js`、`package.json`（`exports["./client"]`、`dsh.client`、`files`）。
 - 测试：`test/` 新增设置层、手动运行、路由的单测。
 - 真实 `desktop` profile：本变更的代码阶段不触碰；重新装入需单独授权。
 - 风险：同一插件同时需要 `loader` 与 `webServer` 服务、浏览器端页面能否装配，需在隔离环境实测。

@@ -3,7 +3,7 @@
  * dsh-autoupdate — READ-ONLY update checker for a DSH Next profile.
  *
  * `--apply` is refused for the `desktop` profile. Installing into desktop is the
- * job of the dsh-autoupdater plugin (plugin/dsh-autoupdater), which runs inside the
+ * job of the dsh-ever-autoupdater plugin (plugin/dsh-ever-autoupdater), which runs inside the
  * host and adds what this script cannot: host-compatibility selection, failed-version
  * memory, enabled-state preservation, rollback, and the "agents running" guard.
  * `desktop` is also managed exclusively by the Electron app, so a side-channel install
@@ -61,7 +61,7 @@ const opts = parseArgs(process.argv.slice(2))
 if (opts.apply && opts.profile === 'desktop') {
   console.error(
     'refused: --apply is disabled for the desktop profile.\n' +
-    '  Installing is done by the dsh-autoupdater plugin inside the host (compat selection,\n' +
+    '  Installing is done by the dsh-ever-autoupdater plugin inside the host (compat selection,\n' +
     '  rollback, running-agent guard). This script only reports for desktop.',
   )
   process.exit(1)
