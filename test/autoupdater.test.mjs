@@ -167,23 +167,8 @@ function makeProfile(dependencies) {
 }
 
 const HOST = '0.2.2-rc.1'
-/** Fake of the market's helpers: engines.dsh 'ok' → compatible, 'bad' → incompatible, absent → unknown. */
-function fakeCompat(compatibleVersions = {}) {
-  return {
-    available: true,
-    hostVersion: HOST,
-    hostPackages: new Set(),
-    manifestFacts: (json) => ({ range: json?.engines?.dsh ?? null }),
-    deriveHostCompatibility: (facts) => ({
-      status: facts.range === 'ok' ? 'compatible' : facts.range === 'bad' ? 'incompatible' : 'unknown',
-      requirement: facts.range === 'bad' ? '>=9.0.0' : null,
-    }),
-    findCompatibleVersion: async (npmName, host, packages, registry, fetcher, minimum) => {
-      const found = compatibleVersions[npmName] ?? null
-      return found !== null && compareVersions(found, minimum ?? '0.0.0') > 0 ? found : null
-    },
-  }
-}
+/** Fake of the market's host info: only the version is read; it no longer screens versions. */
+const fakeCompat = () => ({ available: true, hostVersion: HOST })
 function fakeFetch(manifests) {
   return async (url) => {
     for (const [key, value] of Object.entries(manifests)) {
@@ -200,26 +185,24 @@ function fakeFetch(manifests) {
 const row = (name, current, latest, extra = {}) => ({ name, kind: 'npm', current, version: current, latest, updateAvailable: true, ...extra })
 const cfgDefault = resolveConfig({})
 
-test('plan (npm): latest compatible / undeclared → latest; incompatible → newest compatible; none → skipped', async () => {
-  const state = makeProfile({ a: '1.0.0', b: '1.0.0', c: '1.0.0', d: '1.0.0' })
-  const detected = { rows: [row('a', '1.0.0', '1.0.1'), row('b', '1.0.0', '1.0.1'), row('c', '1.0.0', '2.0.0'), row('d', '1.0.0', '2.0.0')] }
+test('plan (npm): the latest version is installed even when it declares a newer host', async () => {
+  const state = makeProfile({ a: '1.0.0', b: '1.0.0', c: '1.0.0' })
+  const detected = { rows: [row('a', '1.0.0', '1.0.1'), row('b', '1.0.0', '1.0.1'), row('c', '1.0.0', '2.0.0')] }
   const fetchImpl = fakeFetch({
     '/a/1.0.1': { engines: { dsh: 'ok' } },
     '/b/1.0.1': {},
-    '/c/2.0.0': { engines: { dsh: 'bad' } },
-    '/d/2.0.0': { engines: { dsh: 'bad' } },
+    '/c/2.0.0': { engines: { dsh: '>=9.0.0' } },
   })
-  const { plan, skipped, host } = await buildPlan(detected, state, cfgDefault, { compat: fakeCompat({ c: '1.5.0' }), fetchImpl, log })
+  const { plan, skipped, host } = await buildPlan(detected, state, cfgDefault, { compat: fakeCompat(), fetchImpl, log })
   const byName = Object.fromEntries(plan.map((entry) => [entry.name, entry]))
   assert.equal(byName.a.target, 'a@1.0.1')
   assert.equal(byName.b.target, 'b@1.0.1')
-  assert.match(byName.b.note, /no host compatibility declared/)
-  assert.equal(byName.c.target, 'c@1.5.0')
-  assert.match(byName.c.note, /latest 2\.0\.0 needs DSH >=9\.0\.0/)
-  assert.equal(byName.d, undefined)
-  assert.equal(skipped.length, 1)
-  assert.equal(skipped[0].name, 'd')
-  assert.match(skipped[0].reason, /needs DSH >=9\.0\.0, this host is 0\.2\.2-rc\.1/)
+  // No fallback to an older "compatible" version and no note: the market's latest is the target.
+  assert.equal(byName.c.target, 'c@2.0.0')
+  assert.equal(byName.c.version, '2.0.0')
+  assert.equal(byName.c.note, undefined)
+  assert.equal(byName.c.compat, undefined)
+  assert.equal(skipped.length, 0)
   assert.equal(host.version, HOST)
 })
 
@@ -232,20 +215,17 @@ test('plan (npm): a version missing on the registry is skipped without an instal
   assert.match(skipped.find((item) => item.name === 'b').reason, /could not confirm/)
 })
 
-test('plan (git): incompatible → skipped; compatible → update; unreadable → update with a note', async () => {
+test('plan (git): the target commit is installed without reading its manifest', async () => {
   const sha = (char) => char.repeat(40)
-  const state = makeProfile({ g1: 'github:o/g1', g2: 'github:o/g2', g3: 'github:o/g3#path:sub' })
+  const state = makeProfile({ g1: 'github:o/g1', g2: 'github:o/g2#path:sub' })
   const git = (name, latest) => ({ name, kind: 'github', current: sha('0'), latest, updateAvailable: true })
-  const fetchImpl = fakeFetch({
-    [`o/g1/${sha('1')}/package.json`]: { engines: { dsh: 'bad' } },
-    [`o/g2/${sha('2')}/package.json`]: { engines: { dsh: 'ok' } },
-    [`o/g3/${sha('3')}/sub/package.json`]: 500,
-  })
-  const { plan, skipped } = await buildPlan({ rows: [git('g1', sha('1')), git('g2', sha('2')), git('g3', sha('3'))] }, state, cfgDefault, { compat: fakeCompat(), fetchImpl, log })
-  assert.deepEqual(plan.map((entry) => entry.name).sort(), ['g2', 'g3'])
-  assert.match(skipped[0].reason, /history is not searched/)
-  assert.match(plan.find((entry) => entry.name === 'g3').note, /could not read the compatibility declaration/)
-  assert.equal(plan.find((entry) => entry.name === 'g2').floating, true)
+  const urls = []
+  const fetchImpl = async (url) => { urls.push(String(url)); return { ok: true, status: 200, json: async () => ({ engines: { dsh: '>=9.0.0' } }) } }
+  const { plan, skipped } = await buildPlan({ rows: [git('g1', sha('1')), git('g2', sha('2'))] }, state, cfgDefault, { compat: fakeCompat(), fetchImpl, log })
+  assert.deepEqual(plan.map((entry) => entry.name).sort(), ['g1', 'g2'])
+  assert.equal(skipped.length, 0, 'a declaration of a newer host does not skip the commit')
+  assert.deepEqual(urls, [], 'the target commit manifest is not read any more')
+  assert.equal(plan.find((entry) => entry.name === 'g1').floating, true)
 })
 
 test('plan: exclusions each carry a reason; prerelease off by default; order is patch → minor → major', async () => {
@@ -468,13 +448,13 @@ test('run: re-entry guard skips a second concurrent run', async () => {
 
 // ------------------------------------------------------------------ order: fetch before market functions
 
-test('order: all registry/manifest fetches happen before any market compat function is called', async () => {
+test('order: registry facts are read before the host version is resolved', async () => {
+  // Importing the market module installs its own dispatcher and breaks `fetch` afterwards,
+  // so every registry read has to happen first.
   const state = makeProfile({ p: '1.0.0', q: '1.0.0' })
   const events = []
-  const compat = fakeCompat()
-  const derive = compat.deriveHostCompatibility
-  compat.deriveHostCompatibility = (...args) => { events.push('derive'); return derive(...args) }
+  const compat = { available: true, get hostVersion() { events.push('host'); return HOST } }
   const fetchImpl = async (url) => { events.push('fetch'); return fakeFetch({ '/p/1.1.0': {}, '/q/1.1.0': {} })(url) }
   await buildPlan({ rows: [row('p', '1.0.0', '1.1.0'), row('q', '1.0.0', '1.1.0')] }, state, cfgDefault, { compat, fetchImpl, log })
-  assert.equal(events.lastIndexOf('fetch') < events.indexOf('derive'), true, events.join(','))
+  assert.deepEqual(events, ['fetch', 'fetch', 'host'])
 })

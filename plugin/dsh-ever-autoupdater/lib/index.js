@@ -5,9 +5,10 @@
  * list of updates is exactly the one the market UI shows. When that module is not
  * installed, a built-in npm-registry check takes over (npm packages only).
  *
- * Before an update is planned it is checked against the running host (the market's own
- * compatibility functions): a version that declares itself incompatible is not
- * installed; npm sources fall back to the newest compatible version instead.
+ * The update target is always the version the market reported — the host's own
+ * compatibility declaration is not used to pick an older version or to skip a package.
+ * When the host refuses an install it returns the error, the change is rolled back and
+ * the exact target version is remembered so it is not retried every run.
  *
  * Applying goes through the host's in-process `pluginManager` — the same official
  * operation the desktop client uses — so the profile manifest, the bundle bookkeeping
@@ -455,13 +456,12 @@ async function builtinDetect(state, cfg) {
 // ------------------------------------------------------------------ planning
 
 const SEMVER_EXACT = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
-const SHA = /^[0-9a-f]{40}$/i
 
 /**
  * Turn detected rows into install targets: filtered (with a recorded reason for every
  * row that is dropped), checked against the host, and ordered by risk.
  *
- * `deps.compat` and `deps.fetchImpl` are injection points for tests.
+ * `deps.compat` (the host version) and `deps.fetchImpl` are injection points for tests.
  */
 export async function buildPlan(detected, state, cfg, deps = {}) {
   const manifest = readManifest(state.profileDir)
@@ -504,11 +504,12 @@ export async function buildPlan(detected, state, cfg, deps = {}) {
     candidates.push({ row, target })
   }
 
-  // Everything the compatibility check needs is fetched here, with the native `fetch`.
+  // The registry facts are read here, with the native `fetch`, *before* the market module
+  // is imported: importing it installs its own dispatcher and breaks `fetch` afterwards.
   const fetchImpl = deps.fetchImpl ?? ((url, init) => fetch(url, init))
-  const facts = new Map()
+  const registryFacts = new Map()
   for (const { row, target } of candidates) {
-    facts.set(row.name, target.kind === 'npm' ? await fetchNpmManifest(row, cfg, fetchImpl) : await fetchGitManifest(row, manifest, fetchImpl))
+    if (target.kind === 'npm') registryFacts.set(row.name, await fetchNpmManifest(row, cfg, fetchImpl))
   }
 
   const compat = deps.compat ?? (await loadCompat(state, cfg, deps.log))
@@ -516,10 +517,9 @@ export async function buildPlan(detected, state, cfg, deps = {}) {
 
   const plan = []
   for (const { row, target } of candidates) {
-    const fetched = facts.get(row.name)
     const resolved = target.kind === 'npm'
-      ? await resolveNpm(row, target, fetched, compat, cfg, fetchImpl)
-      : resolveGit(row, target, fetched, compat)
+      ? resolveNpm(target, registryFacts.get(row.name))
+      : { entry: {} }
     if (resolved.skip !== undefined) {
       rejected(row, resolved.skip)
       continue
@@ -603,47 +603,25 @@ function externalFor(entry) {
   return entry.floating ? { action: 'update', target: entry.name } : { action: 'add', target: entry.target }
 }
 
-// ------------------------------------------------------------------ compatibility
+// ------------------------------------------------------------------ host version
 
 /**
- * The market's own host-compatibility functions and the host version they judge against.
- * Without the market (or without a readable host version) every candidate counts as
- * "undeclared" — installable, because the host refuses a truly incompatible install by
- * itself and a failure is rolled back.
+ * The host version this profile runs on, read from the market's own `dshHostInfo()`.
+ * It is reported and shown, it does not decide what gets installed.
  */
 async function loadCompat(state, cfg, log) {
-  const none = { available: false, hostVersion: null, hostPackages: new Set() }
+  const none = { available: false, hostVersion: null }
   const modulePath = cfg.marketModule || join(state.profileDir, 'node_modules', MARKET, 'lib', 'updates.js')
-  const lib = dirname(modulePath)
-  const files = {
-    compatibility: join(lib, 'discovery-compatibility.js'),
-    install: join(lib, 'dsh-install.js'),
-    check: join(lib, 'check.js'),
-  }
-  if (!Object.values(files).every((file) => existsSync(file))) return none
+  const file = join(dirname(modulePath), 'dsh-install.js')
+  if (!existsSync(file)) return none
   try {
-    const compatibility = await import(pathToFileURL(files.compatibility).href)
-    const install = await import(pathToFileURL(files.install).href)
-    const check = await import(pathToFileURL(files.check).href)
+    const install = await import(pathToFileURL(file).href)
     const info = install.dshHostInfo()
-    return {
-      available: true,
-      hostVersion: info?.version ?? null,
-      hostPackages: check.corePackageNames(info?.directory ?? null),
-      manifestFacts: compatibility.manifestFacts,
-      deriveHostCompatibility: compatibility.deriveHostCompatibility,
-      findCompatibleVersion: compatibility.findCompatibleVersion,
-    }
+    return { available: true, hostVersion: info?.version ?? null }
   } catch (error) {
-    log?.warn(`the market compatibility check could not be loaded (${describe(error)}) — versions are not screened`)
+    log?.warn(`the host version could not be read (${describe(error)}) — it is left empty in the report`)
     return none
   }
-}
-
-function verdictOf(compat, manifestJson) {
-  if (compat.available !== true || manifestJson === null) return { status: 'unknown', requirement: null }
-  const verdict = compat.deriveHostCompatibility(compat.manifestFacts(manifestJson), compat.hostVersion, compat.hostPackages)
-  return { status: verdict.status, requirement: verdict.requirement ?? null }
 }
 
 async function fetchJsonOrNull(url, fetchImpl) {
@@ -662,59 +640,16 @@ function fetchNpmManifest(row, cfg, fetchImpl) {
   return fetchJsonOrNull(`${cfg.registry}/${encodeURIComponent(row.name)}/${row.latest}`, fetchImpl)
 }
 
-async function resolveNpm(row, target, fetched, compat, cfg, fetchImpl) {
+/**
+ * The only check left on an npm target: the exact version the market named has to exist
+ * on the registry. Whether it declares itself compatible with this host is not asked —
+ * a refusal comes from the host at install time, and a failure is rolled back.
+ */
+function resolveNpm(target, fetched) {
   const latest = target.version
-  if (fetched.missing === true) return { skip: `version ${latest} does not exist on the registry` }
-  if (fetched.error !== undefined) return { skip: `the registry could not confirm ${latest} (${fetched.error})` }
-  const verdict = verdictOf(compat, fetched.json)
-  if (verdict.status !== 'incompatible') {
-    return { entry: { version: latest, compat: verdict.status, ...(verdict.status === 'unknown' && compat.available ? { note: 'no host compatibility declared — installing anyway' } : {}) } }
-  }
-  const alternative = await compat.findCompatibleVersion(
-    row.name,
-    compat.hostVersion,
-    compat.hostPackages,
-    cfg.registry,
-    (url, init) => fetchImpl(url, init),
-    typeof row.current === 'string' && SEMVER_EXACT.test(row.current) ? row.current : null,
-  )
-  if (alternative === null) {
-    return { skip: `${latest} needs DSH ${verdict.requirement ?? '(unknown range)'}, this host is ${compat.hostVersion} — and no newer compatible version exists` }
-  }
-  return {
-    entry: {
-      version: alternative,
-      target: `${row.name}@${alternative}`,
-      compat: 'compatible',
-      note: `latest ${latest} needs DSH ${verdict.requirement ?? '(unknown range)'} (host ${compat.hostVersion}) — using the newest compatible ${alternative}`,
-    },
-  }
-}
-
-/** `owner/repo` and the optional sub-path of a GitHub spec, or null. */
-function githubParts(spec) {
-  const match = /(?:^github:|github\.com[/:])([\w.-]+\/[\w.-]+?)(?:\.git)?(?:[#&]|$)/.exec(spec)
-  if (match === null) return null
-  const sub = /(?:[#&])path:([^&]+)/.exec(spec)
-  return { repo: match[1], path: sub === null ? '' : `${sub[1].replace(/^\/+|\/+$/g, '')}/` }
-}
-
-async function fetchGitManifest(row, manifest, fetchImpl) {
-  const spec = manifest.dependencies?.[row.name]
-  const parts = typeof spec === 'string' ? githubParts(spec) : null
-  if (parts === null || typeof row.latest !== 'string' || !SHA.test(row.latest)) return { error: 'not a GitHub source with a known commit' }
-  return fetchJsonOrNull(`https://raw.githubusercontent.com/${parts.repo}/${row.latest}/${parts.path}package.json`, fetchImpl)
-}
-
-function resolveGit(row, target, fetched, compat) {
-  if (fetched.json === undefined) {
-    return { entry: { compat: 'unknown', note: 'could not read the compatibility declaration of the target commit — installing anyway' } }
-  }
-  const verdict = verdictOf(compat, fetched.json)
-  if (verdict.status === 'incompatible') {
-    return { skip: `target commit needs DSH ${verdict.requirement ?? '(unknown range)'}, this host is ${compat.hostVersion} — history is not searched for an older version` }
-  }
-  return { entry: { compat: verdict.status } }
+  if (fetched?.missing === true) return { skip: `version ${latest} does not exist on the registry` }
+  if (fetched?.error !== undefined) return { skip: `the registry could not confirm ${latest} (${fetched.error})` }
+  return { entry: { version: latest } }
 }
 
 // ------------------------------------------------------------------ applying

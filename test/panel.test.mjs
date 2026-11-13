@@ -39,14 +39,7 @@ function fakeManager(names) {
   }
 }
 
-const fakeCompat = () => ({
-  available: true,
-  hostVersion: '0.2.2-rc.1',
-  hostPackages: new Set(),
-  manifestFacts: () => ({}),
-  deriveHostCompatibility: () => ({ status: 'unknown', requirement: null }),
-  findCompatibleVersion: async () => null,
-})
+const fakeCompat = () => ({ available: true, hostVersion: '0.2.2-rc.1' })
 const okFetch = async () => ({ ok: true, status: 200, json: async () => ({}) })
 const npmRow = (name, latest) => ({ name, kind: 'npm', current: '1.0.0', version: '1.0.0', latest, updateAvailable: true })
 
